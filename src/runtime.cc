@@ -9870,6 +9870,40 @@ RUNTIME_FUNCTION(MaybeObject*, Runtime_GlobalPrint) {
   return string;
 }
 
+// Object Observation
+RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectObserve) {
+  HandleScope scope(isolate);
+  ASSERT(args.length() == 2);
+  Factory* factory = isolate->factory();
+
+  const char *kHiddenObserverStr = "___observer";
+  Handle<String> key = factory->NewStringFromAscii(                                    \
+          Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+
+  CONVERT_ARG_CHECKED(JSObject, obj, 0);
+  RUNTIME_ASSERT(args[1]->IsJSFunction() ||
+                 args[1]->IsUndefined() ||
+                 args[1]->IsNull());
+  Handle<Object> callback = args.at<Object>(1);
+  // TODO SetInternalField() for optimziation?
+
+  return obj->SetHiddenProperty(*key, *callback);
+}
+
+RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectUnobserve) {
+  HandleScope scope(isolate);
+  ASSERT(args.length() == 2);
+  Heap* heap = isolate->heap();
+  return heap->undefined_value();
+}
+
+RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectNotifyObservers) {
+  HandleScope scope(isolate);
+  ASSERT(args.length() == 1);
+  Heap* heap = isolate->heap();
+  return heap->undefined_value();
+}
+
 // Moves all own elements of an object, that are below a limit, to positions
 // starting at zero. All undefined values are placed after non-undefined values,
 // and are followed by non-existing element. Does not change the length

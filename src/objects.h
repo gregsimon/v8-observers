@@ -177,6 +177,7 @@ enum KeyedAccessGrowMode {
 const int kElementsKindCount = LAST_ELEMENTS_KIND - FIRST_ELEMENTS_KIND + 1;
 
 void PrintElementsKind(FILE* out, ElementsKind kind);
+void FireObjectObservations();
 
 inline bool IsMoreGeneralElementsKindTransition(ElementsKind from_kind,
                                                 ElementsKind to_kind);

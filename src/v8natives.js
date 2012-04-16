@@ -277,6 +277,21 @@ function ObjectPropertyIsEnumerable(V) {
 }
 
 
+// Object Observation
+function ObjectObserve(object, callback) {
+  // When anything on this object changes, call the callback.
+  return %ObjectObserve(object, callback);
+}
+
+function ObjectUnobserve(object, callback) {
+  return %ObjectUnobserve(object, callback);
+}
+
+function ObjectNotifyObservers(changeRecord) {
+  return %ObjectNotifyObservers(changeRecord);
+}
+
+
 // Extensions for providing property getters and setters.
 function ObjectDefineGetter(name, fun) {
   var receiver = this;
@@ -1293,6 +1308,9 @@ function SetUpObject() {
     "hasOwnProperty", ObjectHasOwnProperty,
     "isPrototypeOf", ObjectIsPrototypeOf,
     "propertyIsEnumerable", ObjectPropertyIsEnumerable,
+    "observe", ObjectObserve,
+    "unobserve", ObjectUnobserve,
+    "notifyObservers", ObjectNotifyObservers,
     "__defineGetter__", ObjectDefineGetter,
     "__lookupGetter__", ObjectLookupGetter,
     "__defineSetter__", ObjectDefineSetter,

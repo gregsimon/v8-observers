@@ -56,6 +56,73 @@
 namespace v8 {
 namespace internal {
 
+// Object observation
+enum ObjectMutationType {
+  VALUE_MUTATION,
+  DESCRIPTOR_CHANGE
+};
+struct ObservationChangeRecord {
+  Object** object;
+  int type;
+  String* name;
+  Object* old_value;
+  Object* new_value;
+};
+static List<ObservationChangeRecord>* enqueued_observation_changes_ = NULL;
+
+static void EnqueueObservationChange(JSObject* obj, String* name, int type, 
+      Object* old_value, Object* new_value);
+
+void EnqueueObservationChange(JSObject* obj, String* name, int type, 
+      Object* old_value, Object* new_value) {
+
+  if (!enqueued_observation_changes_)
+    enqueued_observation_changes_ = new List<ObservationChangeRecord>;
+
+  Isolate* isolate = Isolate::Current();
+  ObservationChangeRecord record;
+  Handle<Object> handle = isolate->global_handles()->Create(obj);
+
+  record.object = handle.location();
+  record.type = type;
+  record.old_value = old_value;
+  record.new_value = new_value;
+
+  enqueued_observation_changes_->Add(record);
+}
+
+
+void FireObjectObservations() {
+  Isolate* isolate = Isolate::Current();
+  Factory* factory = isolate->factory();
+
+  // protect against items that may be scheduled during the callbacks
+  List<ObservationChangeRecord> *changes = enqueued_observation_changes_;
+  enqueued_observation_changes_ = NULL;
+
+  const char *kHiddenObserverStr = "___observer";
+    Handle<String> key = factory->NewStringFromAscii(
+            Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+
+  for (int i=0; i < changes->length(); ++i) {
+
+    JSObject* this_handle = JSObject::cast(*(changes->at(i).object));
+
+    Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
+    if (callbackFn->IsJSFunction()) {
+      bool has_pending_exception = false;
+      Execution::Call(callbackFn, Handle<Object>(this_handle), 0, NULL, &has_pending_exception);
+      if (has_pending_exception) {
+        // TODO
+      }
+    }
+
+    isolate->global_handles()->Destroy(changes->at(i).object);
+  }
+
+  delete changes;
+}
+
 void PrintElementsKind(FILE* out, ElementsKind kind) {
   ElementsAccessor* accessor = ElementsAccessor::ForKind(kind);
   PrintF(out, "%s", accessor->name());
@@ -1949,7 +2016,27 @@ MaybeObject* JSReceiver::SetProperty(String* name,
                                      StrictModeFlag strict_mode) {
   LookupResult result(GetIsolate());
   LocalLookup(name, &result);
-  return SetProperty(&result, name, value, attributes, strict_mode);
+  MaybeObject* ret = SetProperty(&result, name, value, attributes, strict_mode);
+  {
+    // is there an observer on this object?
+    Isolate* isolate = GetIsolate();
+    HandleScope scope(isolate);
+    JSObject*  this_handle = JSObject::cast(this);
+    Factory* factory = isolate->factory();
+
+    const char *kHiddenObserverStr = "___observer";
+    Handle<String> key = factory->NewStringFromAscii(
+            Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+
+    Handle<Object> stored_value(this_handle->GetHiddenProperty(*key));
+    if (stored_value->IsJSFunction()) {
+      //Handle<Object> handle = isolate->global_handles()->Create(this_handle);
+      EnqueueObservationChange(this_handle, name, VALUE_MUTATION, NULL, NULL);
+      //EnqueueObservationChange(handle.location(), VALUE_MUTATION, name, NULL, NULL);
+      //enqueued_observation_callbacks_.Add(handle.location());
+    }
+  }
+  return ret;
 }
 
 
@@ -2029,6 +2116,7 @@ MaybeObject* JSReceiver::SetPropertyWithDefinedSetter(JSReceiver* setter,
   Handle<Object> value_handle(value, isolate);
   Handle<JSReceiver> fun(setter, isolate);
   Handle<JSReceiver> self(this, isolate);
+
 #ifdef ENABLE_DEBUGGER_SUPPORT
   Debug* debug = isolate->debug();
   // Handle stepping into a setter if step into is active.
