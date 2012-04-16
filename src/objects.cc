@@ -93,15 +93,20 @@ void EnqueueObservationChange(JSObject* obj, String* name, int type,
 
 
 void FireObjectObservations() {
+
+  if (!enqueued_observation_changes_)
+    return;
+
   Isolate* isolate = Isolate::Current();
   Factory* factory = isolate->factory();
+  HandleScope scope(isolate);
 
   // protect against items that may be scheduled during the callbacks
   List<ObservationChangeRecord> *changes = enqueued_observation_changes_;
   enqueued_observation_changes_ = NULL;
 
   const char *kHiddenObserverStr = "___observer";
-    Handle<String> key = factory->NewStringFromAscii(
+  Handle<String> key = factory->NewStringFromAscii(
             Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
 
   for (int i=0; i < changes->length(); ++i) {
@@ -2022,15 +2027,16 @@ MaybeObject* JSReceiver::SetProperty(String* name,
     Isolate* isolate = GetIsolate();
     HandleScope scope(isolate);
     JSObject*  this_handle = JSObject::cast(this);
-    Factory* factory = isolate->factory();
 
-    const char *kHiddenObserverStr = "___observer";
-    Handle<String> key = factory->NewStringFromAscii(
-            Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+    if (this_handle->HasHiddenProperties()) {
+      const char *kHiddenObserverStr = "___observer";
+      Handle<String> key = isolate->factory()->NewStringFromAscii(
+              Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
 
-    Handle<Object> stored_value(this_handle->GetHiddenProperty(*key));
-    if (stored_value->IsJSFunction()) {
-      EnqueueObservationChange(this_handle, name, VALUE_MUTATION, NULL, NULL);
+      Handle<Object> stored_value(this_handle->GetHiddenProperty(*key));
+      if (stored_value->IsJSFunction()) {
+        EnqueueObservationChange(this_handle, name, VALUE_MUTATION, NULL, NULL);
+      }
     }
   }
   return ret;
