@@ -2030,10 +2030,7 @@ MaybeObject* JSReceiver::SetProperty(String* name,
 
     Handle<Object> stored_value(this_handle->GetHiddenProperty(*key));
     if (stored_value->IsJSFunction()) {
-      //Handle<Object> handle = isolate->global_handles()->Create(this_handle);
       EnqueueObservationChange(this_handle, name, VALUE_MUTATION, NULL, NULL);
-      //EnqueueObservationChange(handle.location(), VALUE_MUTATION, name, NULL, NULL);
-      //enqueued_observation_callbacks_.Add(handle.location());
     }
   }
   return ret;
@@ -2116,7 +2113,6 @@ MaybeObject* JSReceiver::SetPropertyWithDefinedSetter(JSReceiver* setter,
   Handle<Object> value_handle(value, isolate);
   Handle<JSReceiver> fun(setter, isolate);
   Handle<JSReceiver> self(this, isolate);
-
 #ifdef ENABLE_DEBUGGER_SUPPORT
   Debug* debug = isolate->debug();
   // Handle stepping into a setter if step into is active.
