@@ -30,17 +30,24 @@
 
   function MyObject() {
     this.a = "a";
-    this.b = "b";
+  }
+
+  function observerCallback(changes) {
   }
 
   var target = new MyObject();
 
   // Observe the object.
-  Object.observe(target, function(changeRecords) {
-    print(" ***** we just saw a change in the object! - " + changeRecords)
-  });
+  Object.observe(target, observerCallback);
+  target.a = "b";
 
-  // Make the change, triggering the observation callback.
-  target.a = "aa";
+  Object.unobserve(target, observerCallback);
+  target.a = "c";
+
+  Object.observe(target, observerCallback);
+
+  target.a = "d";
 })();
+
+print("done.")
 

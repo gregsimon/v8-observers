@@ -57,6 +57,7 @@ namespace v8 {
 namespace internal {
 
 // Object observation
+const char *kHiddenObserverStr = "___observer";
 enum ObjectMutationType {
   VALUE_MUTATION,
   DESCRIPTOR_CHANGE
@@ -84,6 +85,7 @@ void EnqueueObservationChange(JSObject* obj, String* name, int type,
   Handle<Object> handle = isolate->global_handles()->Create(obj);
 
   record.object = handle.location();
+  record.name = name;
   record.type = type;
   record.old_value = old_value;
   record.new_value = new_value;
@@ -105,18 +107,38 @@ void FireObjectObservations() {
   List<ObservationChangeRecord> *changes = enqueued_observation_changes_;
   enqueued_observation_changes_ = NULL;
 
-  const char *kHiddenObserverStr = "___observer";
   Handle<String> key = factory->NewStringFromAscii(
-            Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+          Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+  Handle<String> name_sym = factory->LookupAsciiSymbol(CStrVector("name"));
+  Handle<String> type_sym = factory->NewStringFromAscii(CStrVector("type"));
+  Handle<String> value_sym = factory->NewStringFromAscii(CStrVector("value"));
+  Handle<String> descriptor_sym = factory->NewStringFromAscii(CStrVector("descriptor"));
+  //Handle<String> object_sym = factory->LookupAsciiSymbol(CStrVector("object"));
+  //Handle<String> old_value_sym = factory->LookupAsciiSymbol(CStrVector("oldValue"));
 
   for (int i=0; i < changes->length(); ++i) {
 
-    JSObject* this_handle = JSObject::cast(*(changes->at(i).object));
+    MaybeObject* ignore;
+    ObservationChangeRecord& record = changes->at(i);
+    JSObject* this_handle = JSObject::cast(*(record.object));
 
     Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
     if (callbackFn->IsJSFunction()) {
+      Handle<JSObject> recordObject =
+          factory->NewJSObject(isolate->object_function(), TENURED);
+
+      ignore = recordObject->SetProperty(
+          *name_sym, record.name, NONE, kNonStrictMode);
+      ignore = recordObject->SetProperty(
+          *type_sym, 
+          Object::cast( (record.type == VALUE_MUTATION) ? *value_sym : *descriptor_sym), 
+          NONE, kNonStrictMode);
+
+      USE(ignore);
+
+      Handle<Object> args[] = { recordObject };
       bool has_pending_exception = false;
-      Execution::Call(callbackFn, Handle<Object>(this_handle), 0, NULL, &has_pending_exception);
+      Execution::Call(callbackFn, Handle<Object>(this_handle), 2, args, &has_pending_exception);
       if (has_pending_exception) {
         // TODO
       }
@@ -2029,7 +2051,6 @@ MaybeObject* JSReceiver::SetProperty(String* name,
     JSObject*  this_handle = JSObject::cast(this);
 
     if (this_handle->HasHiddenProperties()) {
-      const char *kHiddenObserverStr = "___observer";
       Handle<String> key = isolate->factory()->NewStringFromAscii(
               Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
 

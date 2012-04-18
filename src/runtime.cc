@@ -9877,7 +9877,7 @@ RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectObserve) {
   Factory* factory = isolate->factory();
 
   const char *kHiddenObserverStr = "___observer";
-  Handle<String> key = factory->NewStringFromAscii(                                    \
+  Handle<String> key = factory->NewStringFromAscii(
           Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
 
   CONVERT_ARG_CHECKED(JSObject, obj, 0);
@@ -9892,9 +9892,21 @@ RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectObserve) {
 
 RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectUnobserve) {
   HandleScope scope(isolate);
-  ASSERT(args.length() == 2);
-  Heap* heap = isolate->heap();
-  return heap->undefined_value();
+  ASSERT(args.length() >= 1);
+
+  CONVERT_ARG_CHECKED(JSObject, obj, 0);
+  RUNTIME_ASSERT(args[1]->IsJSFunction() ||
+                 args[1]->IsUndefined() ||
+                 args[1]->IsNull());
+
+  if (obj->HasHiddenProperties()) {
+      const char *kHiddenObserverStr = "___observer";
+      Handle<String> key = isolate->factory()->NewStringFromAscii(
+              Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
+      obj->DeleteHiddenProperty(*key);
+  }
+
+  return isolate->heap()->undefined_value();
 }
 
 RUNTIME_FUNCTION(MaybeObject*, Runtime_ObjectNotifyObservers) {
