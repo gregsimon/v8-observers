@@ -64,18 +64,27 @@ enum ObjectMutationType {
 };
 struct ObservationChangeRecord {
   Object** object;
-  int type;
+  Object** observerFn; // for sorting purposes
   String* name;
+  int type;
   Object* old_value;
   Object* new_value;
 };
 static List<ObservationChangeRecord>* enqueued_observation_changes_ = NULL;
 
 static void EnqueueObservationChange(JSObject* obj, String* name, int type, 
-      Object* old_value, Object* new_value);
+      Object* observerFn, Object* old_value, Object* new_value);
+static int compare_callback_functions(const ObservationChangeRecord* x, 
+      const ObservationChangeRecord* y);
+
+// Sort the property changes based on callback functions (observers)
+int compare_callback_functions(const ObservationChangeRecord* x, 
+      const ObservationChangeRecord* y) {
+  return *x->observerFn > *y->observerFn;
+}
 
 void EnqueueObservationChange(JSObject* obj, String* name, int type, 
-      Object* old_value, Object* new_value) {
+      Object* observerFn, Object* old_value, Object* new_value) {
 
   if (!enqueued_observation_changes_)
     enqueued_observation_changes_ = new List<ObservationChangeRecord>;
@@ -83,8 +92,10 @@ void EnqueueObservationChange(JSObject* obj, String* name, int type,
   Isolate* isolate = Isolate::Current();
   ObservationChangeRecord record;
   Handle<Object> handle = isolate->global_handles()->Create(obj);
+  Handle<Object> observerHandle = isolate->global_handles()->Create(observerFn);
 
   record.object = handle.location();
+  record.observerFn = observerHandle.location();
   record.name = name;
   record.type = type;
   record.old_value = old_value;
@@ -116,11 +127,18 @@ void FireObjectObservations() {
   //Handle<String> object_sym = factory->LookupAsciiSymbol(CStrVector("object"));
   //Handle<String> old_value_sym = factory->LookupAsciiSymbol(CStrVector("oldValue"));
 
+  // Sort the list based on the callbackFn objects, then we'll
+  // deliver #n unique callbacks.
+  changes->Sort(compare_callback_functions);
+
   for (int i=0; i < changes->length(); ++i) {
 
     MaybeObject* ignore;
     ObservationChangeRecord& record = changes->at(i);
     JSObject* this_handle = JSObject::cast(*(record.object));
+
+    printf("change[%d] object=%p callback=%p\n", i, (void*)*record.object,
+        (void*)*record.observerFn);
 
     Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
     if (callbackFn->IsJSFunction()) {
@@ -144,7 +162,8 @@ void FireObjectObservations() {
       }
     }
 
-    isolate->global_handles()->Destroy(changes->at(i).object);
+    isolate->global_handles()->Destroy(record.object);
+    isolate->global_handles()->Destroy(record.observerFn);
   }
 
   delete changes;
@@ -2056,7 +2075,7 @@ MaybeObject* JSReceiver::SetProperty(String* name,
 
       Handle<Object> stored_value(this_handle->GetHiddenProperty(*key));
       if (stored_value->IsJSFunction()) {
-        EnqueueObservationChange(this_handle, name, VALUE_MUTATION, NULL, NULL);
+        EnqueueObservationChange(this_handle, name, VALUE_MUTATION, *stored_value, NULL, NULL);
       }
     }
   }

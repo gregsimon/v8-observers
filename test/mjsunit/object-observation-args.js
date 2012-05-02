@@ -25,7 +25,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Test Object observation
+// Test Object observation arguments
 (function() {
 
   function MyObject() {
@@ -33,24 +33,15 @@
   }
 
   function observerCallback1(changes) {
-    print(" -- callback1");
-  }
-  function observerCallback2(changes) {
-    print(" -- callback2");
+    print(" -- callback1" + changes);
   }
 
   var target1 = new MyObject();
-  var target2 = new MyObject();
 
   // Observe the objects.
   Object.observe(target1, observerCallback1);
-  Object.observe(target2, observerCallback2);
 
   target1.a = "b";
-
-  target2.a = "c";
-  target2.a = "d";
-  
   target1.a = "e";
   target1.a = "f";
 
