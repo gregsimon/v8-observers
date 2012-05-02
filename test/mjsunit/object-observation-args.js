@@ -42,8 +42,10 @@
   Object.observe(target1, observerCallback1);
 
   target1.a = "b";
-  target1.a = "e";
-  target1.a = "f";
+  target1.a = "c";
+  target1.a = "d";
+
+  // we only expect ONE callback here, with three arguments.
 
 })();
 

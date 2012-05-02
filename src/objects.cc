@@ -70,7 +70,8 @@ struct ObservationChangeRecord {
   Object* old_value;
   Object* new_value;
 };
-static List<ObservationChangeRecord>* enqueued_observation_changes_ = NULL;
+typedef List<ObservationChangeRecord> ObservationsList;
+static ObservationsList* enqueued_observation_changes_ = NULL;
 
 static void EnqueueObservationChange(JSObject* obj, String* name, int type, 
       Object* observerFn, Object* old_value, Object* new_value);
@@ -131,17 +132,56 @@ void FireObjectObservations() {
   // deliver #n unique callbacks.
   changes->Sort(compare_callback_functions);
 
+  // the array is now chunked, and we want to dispatch 
+  ObservationsList::iterator startRange = changes->begin();
+  ObservationsList::iterator endRange = changes->begin();
+  Object* curObservationObject = *startRange->observerFn;  
+  endRange++;
+  do {
+    while (endRange != changes->end() && *endRange->observerFn == curObservationObject) {
+      endRange++;
+    }
+
+    if (endRange != startRange) {
+      // we have items to fire.
+      int count = 1;
+      ObservationsList::iterator it=startRange;
+      while (it != endChange)
+        count++;
+
+      Handle<JSArray> recordArray = factory->NewJSArray(count);
+      // TODO populate array
+
+      JSObject* this_handle = JSObject::cast(*startRange->observerFn);
+      Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
+      if (callbackFn->IsJSFunction()) {
+        bool has_pending_exception = false;
+        Execution::Call(callbackFn, Handle<Object>(this_handle), 2, args, &has_pending_exception);
+      }
+    }
+
+    if (endRange == changes->end())
+      break;
+
+    startRange = endRange;
+    curObservationObject = *startRange->observerFn;
+    endRange++;
+
+  } while (1);
+  
+/*
   for (int i=0; i < changes->length(); ++i) {
 
     MaybeObject* ignore;
     ObservationChangeRecord& record = changes->at(i);
     JSObject* this_handle = JSObject::cast(*(record.object));
 
-    printf("change[%d] object=%p callback=%p\n", i, (void*)*record.object,
-        (void*)*record.observerFn);
+    //printf("change[%d] object=%p callback=%p\n", i, (void*)*record.object,
+    //    (void*)*record.observerFn);
 
     Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
     if (callbackFn->IsJSFunction()) {
+      //Handle<JSArray> recordArray = factory->New
       Handle<JSObject> recordObject =
           factory->NewJSObject(isolate->object_function(), TENURED);
 
@@ -164,7 +204,7 @@ void FireObjectObservations() {
 
     isolate->global_handles()->Destroy(record.object);
     isolate->global_handles()->Destroy(record.observerFn);
-  }
+  } */
 
   delete changes;
 }
