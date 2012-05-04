@@ -121,90 +121,80 @@ void FireObjectObservations() {
 
   Handle<String> key = factory->NewStringFromAscii(
           Vector<const char>(kHiddenObserverStr, sizeof(kHiddenObserverStr) - 1));
-  Handle<String> name_sym = factory->LookupAsciiSymbol(CStrVector("name"));
+  Handle<String> name_sym = factory->LookupAsciiSymbol(
+        Vector<const char>("name", sizeof("name") - 1));
   Handle<String> type_sym = factory->NewStringFromAscii(CStrVector("type"));
   Handle<String> value_sym = factory->NewStringFromAscii(CStrVector("value"));
   Handle<String> descriptor_sym = factory->NewStringFromAscii(CStrVector("descriptor"));
-  //Handle<String> object_sym = factory->LookupAsciiSymbol(CStrVector("object"));
-  //Handle<String> old_value_sym = factory->LookupAsciiSymbol(CStrVector("oldValue"));
 
   // Sort the list based on the callbackFn objects, then we'll
   // deliver #n unique callbacks.
   changes->Sort(compare_callback_functions);
 
   // the array is now chunked, and we want to dispatch 
-  ObservationsList::iterator startRange = changes->begin();
-  ObservationsList::iterator endRange = changes->begin();
-  Object* curObservationObject = *startRange->observerFn;  
-  endRange++;
-  do {
-    while (endRange != changes->end() && *endRange->observerFn == curObservationObject) {
-      endRange++;
+  int startIndex = 0;
+  int endIndex = 1;
+  Object* curObservationObject = *(changes->at(startIndex).observerFn);
+  while (1) {
+
+    while (endIndex < changes->length() && 
+            *(changes->at(endIndex).observerFn) == curObservationObject) {
+      endIndex++;
     }
 
-    if (endRange != startRange) {
-      // we have items to fire.
-      int count = 1;
-      ObservationsList::iterator it=startRange;
-      while (it != endChange)
-        count++;
+    printf("(group) s=%d e=%d  %d records\n", startIndex, endIndex, endIndex - startIndex);
+    if (endIndex != startIndex) {
+      
+      ObservationChangeRecord& record = changes->at(startIndex);
+      int count = endIndex - startIndex;
+      MaybeObject* ignore;
 
-      Handle<JSArray> recordArray = factory->NewJSArray(count);
-      // TODO populate array
+      // build the array of changes records
+      Handle<FixedArray> records_sent;
+      records_sent = factory->NewFixedArray(count);
 
-      JSObject* this_handle = JSObject::cast(*startRange->observerFn);
-      Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
-      if (callbackFn->IsJSFunction()) {
-        bool has_pending_exception = false;
-        Execution::Call(callbackFn, Handle<Object>(this_handle), 2, args, &has_pending_exception);
+      for (int i=0; i<count; ++i) {
+        ObservationChangeRecord& theChangeRecord = changes->at(startIndex+i);
+        Handle<JSObject> recordObject =
+            factory->NewJSObject(isolate->object_function(), TENURED);
+
+        ignore = recordObject->SetProperty(
+            *name_sym,
+            theChangeRecord.name,
+            NONE, kNonStrictMode);
+        ignore = recordObject->SetProperty(
+            *type_sym, 
+            Object::cast( (theChangeRecord.type == VALUE_MUTATION) ? *value_sym : *descriptor_sym),
+            NONE, kNonStrictMode);
+
+        USE(ignore);
+        records_sent->set(i, *recordObject);
       }
+      Handle<JSArray> recordArray = factory->NewJSArrayWithElements(records_sent);
+
+      // call back the observer fn
+      JSObject* this_handle = JSObject::cast(*(record.object));
+      Handle<Object> callbackFn(*record.observerFn);
+
+      bool has_pending_exception = false;
+      Handle<Object> args[] = { recordArray };
+      Execution::Call(callbackFn, Handle<Object>(this_handle), 1, args, &has_pending_exception);
     }
 
-    if (endRange == changes->end())
+    if (endIndex == changes->length())
       break;
 
-    startRange = endRange;
-    curObservationObject = *startRange->observerFn;
-    endRange++;
-
-  } while (1);
+    startIndex = endIndex;
+    curObservationObject = *(changes->at(startIndex).observerFn);
+    endIndex++;
+  }
   
-/*
-  for (int i=0; i < changes->length(); ++i) {
-
-    MaybeObject* ignore;
+  // remove the handles
+  for (int i=0; i<changes->length(); ++i) {
     ObservationChangeRecord& record = changes->at(i);
-    JSObject* this_handle = JSObject::cast(*(record.object));
-
-    //printf("change[%d] object=%p callback=%p\n", i, (void*)*record.object,
-    //    (void*)*record.observerFn);
-
-    Handle<Object> callbackFn(this_handle->GetHiddenProperty(*key));
-    if (callbackFn->IsJSFunction()) {
-      //Handle<JSArray> recordArray = factory->New
-      Handle<JSObject> recordObject =
-          factory->NewJSObject(isolate->object_function(), TENURED);
-
-      ignore = recordObject->SetProperty(
-          *name_sym, record.name, NONE, kNonStrictMode);
-      ignore = recordObject->SetProperty(
-          *type_sym, 
-          Object::cast( (record.type == VALUE_MUTATION) ? *value_sym : *descriptor_sym), 
-          NONE, kNonStrictMode);
-
-      USE(ignore);
-
-      Handle<Object> args[] = { recordObject };
-      bool has_pending_exception = false;
-      Execution::Call(callbackFn, Handle<Object>(this_handle), 2, args, &has_pending_exception);
-      if (has_pending_exception) {
-        // TODO
-      }
-    }
-
     isolate->global_handles()->Destroy(record.object);
-    isolate->global_handles()->Destroy(record.observerFn);
-  } */
+    isolate->global_handles()->Destroy(record.observerFn);    
+  }
 
   delete changes;
 }

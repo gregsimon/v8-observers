@@ -32,11 +32,20 @@
     this.a = "a"; // the property we'll be mutating
   }
 
-  function observerCallback1(changes) {
-    print(" -- callback1");
+  function printAllRecords(records) {
+    for (var i = 0; i < records.length; ++i) {
+      r = records[i];
+      print("  [" + i + "] { name=" + r.name + " type=" + r.type + " }");
+    }
   }
-  function observerCallback2(changes) {
-    print(" -- callback2");
+
+  function observerCallback1(records) {
+    print(" -- callback1 ");
+    printAllRecords(records);
+  }
+  function observerCallback2(records) {
+    print(" -- callback2 ");
+    printAllRecords(records);
   }
 
   var target1 = new MyObject();
