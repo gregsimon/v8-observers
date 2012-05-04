@@ -142,7 +142,6 @@ void FireObjectObservations() {
       endIndex++;
     }
 
-    printf("(group) s=%d e=%d  %d records\n", startIndex, endIndex, endIndex - startIndex);
     if (endIndex != startIndex) {
       
       ObservationChangeRecord& record = changes->at(startIndex);
