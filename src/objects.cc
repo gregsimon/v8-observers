@@ -126,6 +126,7 @@ void FireObjectObservations() {
   Handle<String> type_sym = factory->NewStringFromAscii(CStrVector("type"));
   Handle<String> value_sym = factory->NewStringFromAscii(CStrVector("value"));
   Handle<String> descriptor_sym = factory->NewStringFromAscii(CStrVector("descriptor"));
+  Handle<String> object_sym = factory->NewStringFromAscii(CStrVector("object"));
 
   // Sort the list based on the callbackFn objects, then we'll
   // deliver #n unique callbacks.
@@ -163,7 +164,11 @@ void FireObjectObservations() {
             NONE, kNonStrictMode);
         ignore = recordObject->SetProperty(
             *type_sym, 
-            Object::cast( (theChangeRecord.type == VALUE_MUTATION) ? *value_sym : *descriptor_sym),
+            Object::cast((theChangeRecord.type == VALUE_MUTATION) ? *value_sym : *descriptor_sym),
+            NONE, kNonStrictMode);
+        ignore = recordObject->SetProperty(
+            *object_sym,
+            Object::cast(*theChangeRecord.object),
             NONE, kNonStrictMode);
 
         USE(ignore);

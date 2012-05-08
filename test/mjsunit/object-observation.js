@@ -35,7 +35,8 @@
   function printAllRecords(records) {
     for (var i = 0; i < records.length; ++i) {
       r = records[i];
-      print("  [" + i + "] { name=" + r.name + " type=" + r.type + " }");
+      print("  [" + i + "] { name=" + r.name + " type=" + r.type + 
+                " object=\"" + r.object.debugName + "\" }");
     }
   }
 
@@ -49,8 +50,11 @@
   }
 
   var target1 = new MyObject();
-  var target2 = new MyObject();
+  target1.debugName = "target1";
 
+  var target2 = new MyObject();
+  target2.debugName = "target2";
+  
   // Observe the objects.
   Object.observe(target1, observerCallback1);
   Object.observe(target2, observerCallback2);
